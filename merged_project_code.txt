@@ -1,0 +1,560 @@
+
+
+============================================================
+# File: .\locustfile.py
+============================================================
+
+from locust import HttpUser, task, between
+
+class APIHubUser(HttpUser):
+    # Пауза между действиями пользователя (от 1 до 3 секунд)
+    wait_time = between(1, 3)
+
+    @task(4)
+    def view_dashboard(self):
+        # Имитация открытия дашборда (частая операция)
+        self.client.get("/api/v1/specifications/services", name="GET /services")
+
+    @task(3)
+    def view_specification(self):
+        # Имитация открытия документации демо-сервиса
+        self.client.get("/api/v1/specifications/demo-service/latest", name="GET /latest_spec")
+
+    @task(1)
+    def register_new_spec(self):
+        # Имитация регистрации спецификации (редкая, но тяжелая операция)
+        headers = {
+            "X-Service-Name": "load-test-service",
+            "X-Service-Version": "1.0.0",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "openapi": "3.0.3",
+            "info": {"title": "Load Test API", "version": "1.0.0"},
+            "paths": {}
+        }
+        self.client.post("/api/v1/specifications/", json=payload, headers=headers, name="POST /specifications")
+
+
+
+
+============================================================
+# File: .\merge.py
+============================================================
+
+import os
+
+def merge_python_code(source_dir, output_file):
+    # Папки, которые нужно игнорировать при поиске
+    ignore_dirs = {'.git', '__pycache__', 'venv', 'env', '.venv', '.idea', '.vscode'}
+    
+    # Файл, в который собирается код (чтобы он не считывал сам себя, если расширение .py)
+    ignore_files = {os.path.basename(output_file), 'merge_code.py'}
+
+    merged_files_count = 0
+
+    with open(output_file, 'w', encoding='utf-8') as outfile:
+        for root, dirs, files in os.walk(source_dir):
+            # Фильтруем папки на лету, чтобы os.walk в них даже не заходил
+            dirs[:] = [d for d in dirs if d not in ignore_dirs]
+
+            for file in files:
+                if file.endswith('.py') and file not in ignore_files:
+                    file_path = os.path.join(root, file)
+                    
+                    try:
+                        with open(file_path, 'r', encoding='utf-8') as infile:
+                            content = infile.read()
+                            
+                            # Добавляем красивый заголовок с путем к файлу для наглядности
+                            outfile.write(f"\n\n{'='*60}\n")
+                            outfile.write(f"# File: {file_path}\n")
+                            outfile.write(f"{'='*60}\n\n")
+                            
+                            outfile.write(content)
+                            merged_files_count += 1
+                    except Exception as e:
+                        print(f"Ошибка при чтении файла {file_path}: {e}")
+
+    return merged_files_count
+
+if __name__ == "__main__":
+    # Укажите путь к проекту (точка означает текущую директорию)
+    source_directory = "." 
+    
+    # Имя итогового файла
+    output_filename = "merged_project_code.txt" 
+    
+    print("Начинаю сборку кода...")
+    count = merge_python_code(source_directory, output_filename)
+    print(f"Готово! Объединено файлов: {count}")
+    print(f"Весь код сохранен в файле: {output_filename}")
+
+============================================================
+# File: .\register_mock_services.py
+============================================================
+
+import requests
+
+# URL твоего запущенного Хаба
+HUB_URL = "http://localhost:8080/api/v1/specifications/"
+
+# Данные двух новых сервисов с валидными OpenAPI спецификациями
+mock_services = [
+    {
+        "name": "kedr-analytics",
+        "version": "1.0.0",
+        "spec": {
+            "openapi": "3.0.3",
+            "info": {
+                "title": "Kedr Analytics Core API",
+                "version": "1.0.0",
+                "description": "Аналитическое ядро для предиктивного моделирования, прогнозирования рисков и анализа ключевых бизнес-показателей."
+            },
+            "paths": {
+                "/api/v1/analytics/predict": {
+                    "post": {
+                        "summary": "Расчет прогнозной модели",
+                        "responses": {
+                            "200": {"description": "Успешный расчет прогнозных значений"}
+                        }
+                    }
+                }
+            }
+        }
+    },
+    {
+        "name": "pilyulyus-rag",
+        "version": "0.5.0",
+        "spec": {
+            "openapi": "3.0.3",
+            "info": {
+                "title": "Pilyulyus Medical RAG API",
+                "version": "0.5.0",
+                "description": "Мультиагентная система генерации медицинских синопсисов на основе истории болезни и клинических протоколов методом RAG."
+            },
+            "paths": {
+                "/api/v1/rag/synopsis": {
+                    "post": {
+                        "summary": "Генерация медицинского синопсиса",
+                        "responses": {
+                            "200": {"description": "Синопсис успешно сгенерирован и нормализован"}
+                        }
+                    }
+                }
+            }
+        }
+    }
+]
+
+print("Запуск регистрации дополнительных сервисов...")
+
+for service in mock_services:
+    headers = {
+        "X-Service-Name": service["name"],
+        "X-Service-Version": service["version"],
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.post(HUB_URL, json=service["spec"], headers=headers)
+        if response.status_code == 201:
+            print(f"✅ Сервис успешно добавлен: {service['name']} (v{service['version']})")
+        else:
+            print(f"❌ Ошибка при добавлении {service['name']}: {response.status_code} — {response.text}")
+    except Exception as e:
+        print(f"💥 Не удалось связаться с Хабом: {e}")
+
+============================================================
+# File: .\backend\app\config.py
+============================================================
+
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/apihub"
+    SECRET_KEY: str = "super-secret-key-change-in-prod"
+
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+
+============================================================
+# File: .\backend\app\database.py
+============================================================
+
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+from app.config import settings
+
+engine = create_async_engine(settings.DATABASE_URL, echo=False)
+AsyncSessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+Base = declarative_base()
+
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
+============================================================
+# File: .\backend\app\main.py
+============================================================
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.database import engine, Base
+from app.routers import specifications, proxy
+
+app = FastAPI(title="API Documentation Hub", version="1.0.0")
+
+# Настройка CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.on_event("startup")
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+app.include_router(specifications.router)
+app.include_router(proxy.router)
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+============================================================
+# File: .\backend\app\models.py
+============================================================
+
+import uuid
+import datetime
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.orm import relationship
+from app.database import Base
+
+class Api(Base):
+    __tablename__ = "apis"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, unique=True, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    versions = relationship("SpecificationVersion", back_populates="api", cascade="all, delete-orphan")
+
+class SpecificationVersion(Base):
+    __tablename__ = "specification_versions"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    api_id = Column(UUID(as_uuid=True), ForeignKey("apis.id", ondelete="CASCADE"))
+    version = Column(String, nullable=False)
+    specification = Column(JSONB, nullable=False)
+    is_active = Column(Boolean, default=True)
+    is_deprecated = Column(Boolean, default=False)
+    registered_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    api = relationship("Api", back_populates="versions")
+
+============================================================
+# File: .\backend\app\schemas.py
+============================================================
+
+from pydantic import BaseModel
+from typing import Dict, Any, List, Optional
+from uuid import UUID
+from datetime import datetime
+
+class SpecResponse(BaseModel):
+    id: UUID
+    version: str
+    is_active: bool
+    is_deprecated: bool
+    registered_at: datetime
+    class Config:
+        from_attributes = True
+
+class ApiResponse(BaseModel):
+    id: UUID
+    name: str
+    description: Optional[str]
+    versions: List[SpecResponse]
+    class Config:
+        from_attributes = True
+
+============================================================
+# File: .\backend\app\routers\proxy.py
+============================================================
+
+import httpx
+from fastapi import APIRouter, Request, Response, HTTPException, Body
+
+router = APIRouter(prefix="/api/v1/proxy", tags=["Proxy"])
+
+# 1. Главная функция-курьер (без роутера, просто делает работу)
+async def do_proxy(path: str, request: Request, target_url: str):
+    if not target_url:
+        raise HTTPException(status_code=400, detail="Missing target_url parameter")
+
+    url = f"{target_url.rstrip('/')}/{path}"
+    
+    headers = dict(request.headers)
+    headers.pop("host", None)
+
+    # Наш исправленный клиент с таймаутом
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            proxy_req = client.build_request(
+                method=request.method,
+                url=url,
+                headers=headers,
+                content=await request.body(),
+                params=request.query_params
+            )
+            proxy_resp = await client.send(proxy_req)
+            
+            return Response(
+                content=proxy_resp.content,
+                status_code=proxy_resp.status_code,
+                headers=dict(proxy_resp.headers)
+            )
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=502, detail=f"Bad Gateway: {str(e)}")
+
+# 2. Пять независимых ручек, чтобы Swagger не путался
+@router.get("/{path:path}")
+async def proxy_get(path: str, request: Request, target_url: str):
+    return await do_proxy(path, request, target_url)
+
+@router.post("/{path:path}")
+async def proxy_post(path: str, request: Request, target_url: str, body: dict = Body(None)):
+    return await do_proxy(path, request, target_url)
+
+@router.put("/{path:path}")
+async def proxy_put(path: str, request: Request, target_url: str, body: dict = Body(None)):
+    return await do_proxy(path, request, target_url)
+
+@router.patch("/{path:path}")
+async def proxy_patch(path: str, request: Request, target_url: str, body: dict = Body(None)):
+    return await do_proxy(path, request, target_url)
+
+@router.delete("/{path:path}")
+async def proxy_delete(path: str, request: Request, target_url: str):
+    return await do_proxy(path, request, target_url)
+
+============================================================
+# File: .\backend\app\routers\specifications.py
+============================================================
+
+from fastapi import APIRouter, Depends, HTTPException, Header
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy import update
+from app.database import get_db
+from app.models import Api, SpecificationVersion
+from app.schemas import ApiResponse
+from app.services.validation import validate_openapi_spec
+import httpx
+
+router = APIRouter(prefix="/api/v1/specifications", tags=["Specifications"])
+
+@router.post("/", status_code=201)
+async def register_specification(
+    spec: dict,
+    x_service_name: str = Header(...),
+    x_service_version: str = Header(...),
+    # x_api_key: str = Header(...) # Раскомментировать для добавления авторизации по ключу
+    db: AsyncSession = Depends(get_db)
+):
+    # 1. Валидация
+    try:
+        validate_openapi_spec(spec)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    # 2. Поиск или создание API
+    result = await db.execute(select(Api).filter(Api.name == x_service_name))
+    api = result.scalars().first()
+    
+    if not api:
+        api = Api(name=x_service_name, description=spec.get("info", {}).get("description", ""))
+        db.add(api)
+        await db.commit()
+        await db.refresh(api)
+
+    # 3. Деактивация старых версий
+    await db.execute(
+        update(SpecificationVersion)
+        .where(SpecificationVersion.api_id == api.id)
+        .values(is_active=False)
+    )
+
+    # 4. Сохранение новой версии
+    new_spec = SpecificationVersion(
+        api_id=api.id,
+        version=x_service_version,
+        specification=spec,
+        is_active=True
+    )
+    db.add(new_spec)
+    await db.commit()
+    
+    return {"message": "Specification registered successfully", "id": str(new_spec.id)}
+
+
+@router.get("/{service_name}/latest")
+async def get_latest_spec(service_name: str, db: AsyncSession = Depends(get_db)):
+    """Возвращает саму JSON-спецификацию для Swagger UI / ReDoc"""
+    result = await db.execute(
+        select(SpecificationVersion)
+        .join(Api)
+        .filter(Api.name == service_name, SpecificationVersion.is_active == True)
+    )
+    spec = result.scalars().first()
+    if not spec:
+        raise HTTPException(status_code=404, detail="Specification not found")
+    return spec.specification
+
+
+@router.get("/services")
+async def get_active_services(db: AsyncSession = Depends(get_db)):
+    """Возвращает список всех зарегистрированных сервисов для отрисовки карточек"""
+    # Делаем JOIN, чтобы достать и данные API, и данные активной версии одним запросом
+    result = await db.execute(
+        select(Api, SpecificationVersion)
+        .join(SpecificationVersion, Api.id == SpecificationVersion.api_id)
+        .filter(SpecificationVersion.is_active == True)
+    )
+    
+    services = []
+    # result.all() вернет список кортежей (Api, SpecificationVersion)
+    for api, spec in result.all():
+        # Берем описание либо из таблицы Api, либо из самого JSON документации
+        description = api.description or spec.specification.get("info", {}).get("description", "Описание отсутствует")
+        
+        services.append({
+            "name": api.name,
+            "version": spec.version,
+            "description": description
+        })
+        
+    return services
+
+
+@router.get("/{service_name}/health")
+async def check_service_health(service_name: str):
+    """
+    Пингует микросервис по его внутреннему имени в Docker (например, demo-service:8000), 
+    чтобы фронтенд мог нарисовать зеленый/красный бейдж статуса.
+    """
+    try:
+        # Устанавливаем короткий таймаут, чтобы дашборд не зависал, если сервис мертв
+        async with httpx.AsyncClient(timeout=1.5) as client:
+            resp = await client.get(f"http://{service_name}:8000/docs")
+            if resp.status_code == 200:
+                return {"status": "online"}
+            return {"status": "error"}
+    except Exception:
+        return {"status": "offline"}
+
+============================================================
+# File: .\backend\app\services\validation.py
+============================================================
+
+from openapi_spec_validator import validate_spec
+from openapi_spec_validator.validation.exceptions import OpenAPIValidationError
+
+def validate_openapi_spec(spec: dict) -> bool:
+    """Валидация спецификации на соответствие OpenAPI 3.x"""
+    if "openapi" not in spec:
+        raise ValueError("Отсутствует обязательное поле 'openapi'")
+    
+    version = spec.get("openapi", "")
+    if not version.startswith("3."):
+        raise ValueError(f"Поддерживается только OpenAPI 3.x.x, получена: {version}")
+
+    try:
+        validate_spec(spec)
+        return True
+    except OpenAPIValidationError as e:
+        raise ValueError(f"Ошибка валидации OpenAPI: {str(e)}")
+
+============================================================
+# File: .\demo-service\main.py
+============================================================
+
+import os
+import asyncio
+import httpx
+from fastapi import FastAPI
+from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+
+# URL хаба, куда будем отправлять документацию
+HUB_URL = os.getenv("HUB_URL", "http://backend:8080/api/v1/specifications/")
+
+app = FastAPI(
+    title="Demo Startup API", 
+    version="1.0.0",
+    servers=[{"url": "http://localhost:8000", "description": "Local Demo Server"}] 
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Разрешаем запросы откуда угодно (для диплома отлично)
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+projects_db = [
+    {"id": 1, "name": "Cedar", "type": "Business Analytics"},
+    {"id": 2, "name": "Pilyulyus", "type": "Medical RAG"}
+]
+
+class ProjectCreate(BaseModel):
+    name: str
+    type: str
+
+async def register_with_hub():
+    # Ждем пару секунд, чтобы бэкенд хаба точно успел подняться первым
+    await asyncio.sleep(2) 
+    spec = app.openapi()
+    headers = {
+        "X-Service-Name": "demo-service",
+        "X-Service-Version": app.version,
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(HUB_URL, json=spec, headers=headers)
+            print(f"Docs registered: {resp.status_code}")
+        except Exception as e:
+            print(f"Failed to register docs: {e}")
+
+# Эта функция сработает автоматически при запуске микросервиса
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(register_with_hub())
+
+# Пара тестовых эндпоинтов для документации
+@app.get("/api/projects")
+def get_startup_projects():
+    """Возвращает список проектов (пример из твоего диплома)"""
+    return projects_db
+
+@app.get("/api/projects/{project_id}")
+def get_project_by_id(project_id: int):
+    """Возвращает проект по его ID"""
+    return {"id": project_id, "name": "Test Project", "status": "active"}
+
+@app.post("/api/projects")
+async def create_project(project: ProjectCreate):
+    new_id = len(projects_db) + 1
+    new_project = {"id": new_id, "name": project.name, "type": project.type}
+    projects_db.append(new_project)
+    print(f"--- Получен POST запрос через прокси: {new_project} ---")
+    return {"message": "Project created!", "project": new_project}
