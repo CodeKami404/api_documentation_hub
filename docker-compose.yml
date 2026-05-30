@@ -6,32 +6,51 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: apihub
     ports:
-      - "5432:5432"
-
+    - 5432:5432
   backend:
     build: ./backend
     ports:
-      - "8080:8080"
+    - 8080:8080
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/apihub
     depends_on:
-      - db
-
+    - db
   demo-service:
     build: ./demo-service
     ports:
-      - "8000:8000"
+    - 8000:8000
     environment:
       HUB_URL: http://backend:8080/api/v1/specifications/
     depends_on:
-      - backend
-
+    - backend
   frontend:
     build: ./frontend
     ports:
-      - "3000:80" # Сайт будет доступен на порту 3000
+    - 3000:80
     depends_on:
-      - backend
+    - backend
     restart: always
-
-
+  auth-service:
+    build: ./auth-service
+    ports:
+    - 8001:8000
+    environment:
+      HUB_URL: http://backend:8080/api/v1/specifications/
+    depends_on:
+    - backend
+  billing-service:
+    build: ./billing-service
+    ports:
+    - 8002:8000
+    environment:
+      HUB_URL: http://backend:8080/api/v1/specifications/
+    depends_on:
+    - backend
+  catalog-service:
+    build: ./catalog-service
+    ports:
+    - 8003:8000
+    environment:
+      HUB_URL: http://backend:8080/api/v1/specifications/
+    depends_on:
+    - backend

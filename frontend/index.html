@@ -40,7 +40,8 @@
             
             <div class="flex items-center gap-4">
                 <div id="view-toggle" class="hidden flex bg-indigo-700 dark:bg-gray-700 rounded-lg p-1">
-                    <button id="btn-swagger" onclick="setViewMode('swagger')" class="px-3 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-sm">Swagger</button>
+                    <button id="btn-overview" onclick="setViewMode('overview')" class="px-3 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-sm">Обзор</button>
+                    <button id="btn-swagger" onclick="setViewMode('swagger')" class="px-3 py-1 text-xs font-bold rounded-md text-indigo-100 hover:text-white">Swagger</button>
                     <button id="btn-redoc" onclick="setViewMode('redoc')" class="px-3 py-1 text-xs font-bold rounded-md text-indigo-100 hover:text-white">ReDoc</button>
                 </div>
                 
@@ -65,14 +66,76 @@
                 <h1 class="text-3xl font-extrabold text-gray-900 dark:text-white">Реестр API</h1>
                 <p class="text-gray-500 dark:text-gray-400 mt-1">Динамический список зарегистрированных систем</p>
             </div>
+            <div id="adminActions" class="hidden">
+                <button onclick="showMockModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Добавить Mock Сервис
+                </button>
+            </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="servicesGrid">
             </div>
     </main>
 
+    <!-- Модальное окно для создания мок сервиса -->
+    <div id="mockModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex justify-center items-center">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 w-full max-w-md border border-gray-200 dark:border-gray-700">
+            <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-4">Создать Mock Сервис</h2>
+            <form id="mockForm" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-1">Название сервиса (англ, без пробелов)</label>
+                    <input type="text" id="mockName" required placeholder="например: loyalty-service" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-1">Версия</label>
+                    <input type="text" id="mockVersion" required placeholder="1.0.0" value="1.0.0" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-gray-700 dark:text-gray-300 text-sm font-semibold mb-1">Описание</label>
+                    <textarea id="mockDescription" rows="3" placeholder="Краткое описание заглушки" class="w-full bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500"></textarea>
+                </div>
+                <div id="mockError" class="text-red-500 text-sm hidden"></div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button type="button" onclick="hideMockModal()" class="px-4 py-2 text-gray-600 dark:text-gray-400 font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition">Отмена</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded transition shadow-sm">Создать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="docs-wrapper" class="hidden flex-grow flex flex-col bg-white dark:bg-gray-900 w-full border-t border-gray-200 dark:border-gray-800">
-        <div class="p-2"><button onclick="showDashboard()" class="text-gray-500 text-sm hover:text-indigo-600">← Назад</button></div>
-        <div id="swagger-ui" class="block"></div>
+        <div class="p-2 border-b border-gray-200 dark:border-gray-800 flex items-center gap-4">
+            <button onclick="showDashboard()" class="text-gray-500 text-sm hover:text-indigo-600 font-semibold px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition">← Назад к списку</button>
+        </div>
+        
+        <!-- КОНТЕЙНЕР ОБЗОРА -->
+        <div id="overview-container" class="hidden flex-grow overflow-y-auto p-8 max-w-4xl mx-auto w-full">
+            <div class="bg-indigo-50 dark:bg-gray-800 rounded-2xl p-8 mb-8 shadow-sm border border-indigo-100 dark:border-gray-700">
+                <h2 id="ov-title" class="text-3xl font-extrabold text-indigo-900 dark:text-white mb-2">Загрузка...</h2>
+                <div class="flex items-center gap-3 mb-6">
+                    <span id="ov-version" class="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-sm">v0.0.0</span>
+                    <span class="text-gray-500 dark:text-gray-400 text-sm font-medium">OpenAPI <span id="ov-openapi">3.0.0</span></span>
+                </div>
+                <p id="ov-desc" class="text-gray-700 dark:text-gray-300 leading-relaxed text-lg"></p>
+            </div>
+            
+            <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <svg class="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+                Доступные эндпоинты
+            </h3>
+            <div id="ov-endpoints" class="space-y-3">
+                <!-- Сюда JS вставит эндпоинты -->
+            </div>
+            
+            <div class="mt-8 p-6 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-200 dark:border-gray-700 text-center">
+                <p class="text-gray-600 dark:text-gray-400 mb-4">Для детального изучения параметров запросов и ответов переключитесь в режим документации.</p>
+                <button onclick="setViewMode('swagger')" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition shadow-md">
+                    Открыть Swagger UI
+                </button>
+            </div>
+        </div>
+
+        <div id="swagger-ui" class="hidden"></div>
         <div id="redoc-container" class="hidden"></div>
     </div>
 
@@ -81,7 +144,7 @@
     
     <script>
         let currentService = null;
-        let currentMode = 'swagger';
+        let currentMode = 'overview'; // По умолчанию теперь Обзор
 
         // === ЛОГИКА УРОВНЯ 2: ДИНАМИЧЕСКИЙ СПИСОК ===
         async function loadServices() {
@@ -121,18 +184,27 @@
                         console.log(`Не удалось проверить статус ${service.name}`);
                     }
 
+                    const versionOptions = service.versions.map(v => 
+                        `<option value="${v}" ${v === service.latest_version ? 'selected' : ''}>${v}</option>`
+                    ).join('');
+
                     const card = `
-                        <div class="service-card bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500 transition cursor-pointer" onclick="openService('${service.name}')">
+                        <div class="service-card bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-500 transition">
                             <div class="flex justify-between items-start mb-4">
                                 <h2 class="service-name text-lg font-bold text-gray-900 dark:text-white">${service.name}</h2>
                                 <span class="bg-${healthColor}-100 dark:bg-${healthColor}-900 text-${healthColor}-800 dark:text-${healthColor}-300 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-${healthColor}-200 dark:border-${healthColor}-800">${healthStatus.toUpperCase()}</span>
                             </div>
                             <p class="text-gray-600 dark:text-gray-400 text-sm mb-2 h-10 line-clamp-2">${service.description}</p>
-                            <p class="text-gray-400 dark:text-gray-500 text-xs mb-4">Версия: ${service.version}</p>
-                            <div class="text-indigo-600 dark:text-indigo-400 text-sm font-semibold flex items-center gap-1 group">
-                                Открыть документацию 
-                                <svg class="w-4 h-4 transform group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            <div class="flex items-center gap-2 mb-4">
+                                <label class="text-gray-400 dark:text-gray-500 text-xs font-medium">Версия:</label>
+                                <select id="version-${service.name}" class="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white text-xs rounded p-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+                                    ${versionOptions}
+                                </select>
                             </div>
+                            <button onclick="openService('${service.name}')" class="text-indigo-600 dark:text-indigo-400 text-sm font-semibold flex items-center gap-1 group w-full text-left">
+                                Открыть обзор сервиса
+                                <svg class="w-4 h-4 transform group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            </button>
                         </div>
                     `;
                     grid.innerHTML += card;
@@ -143,33 +215,91 @@
             }
         }
 
+        let currentVersion = null;
+
         function openService(name) {
             currentService = name;
+            currentVersion = document.getElementById(`version-${name}`).value;
+            currentMode = 'overview'; // Всегда начинаем с обзора
             document.getElementById('dashboard').classList.add('hidden');
             document.getElementById('docs-wrapper').classList.remove('hidden');
             document.getElementById('view-toggle').classList.remove('hidden');
-            renderDocs();
+            setViewMode('overview'); // Это вызовет renderDocs
         }
 
         function setViewMode(mode) {
             currentMode = mode;
-            const isSwagger = mode === 'swagger';
             
-            document.getElementById('btn-swagger').className = isSwagger ? 'px-3 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-sm' : 'px-3 py-1 text-xs font-bold rounded-md text-indigo-100 hover:text-white';
-            document.getElementById('btn-redoc').className = !isSwagger ? 'px-3 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-sm' : 'px-3 py-1 text-xs font-bold rounded-md text-indigo-100 hover:text-white';
+            const btnActive = 'px-3 py-1 text-xs font-bold rounded-md bg-white text-indigo-600 shadow-sm transition';
+            const btnInactive = 'px-3 py-1 text-xs font-bold rounded-md text-indigo-100 hover:text-white transition';
+            
+            document.getElementById('btn-overview').className = mode === 'overview' ? btnActive : btnInactive;
+            document.getElementById('btn-swagger').className = mode === 'swagger' ? btnActive : btnInactive;
+            document.getElementById('btn-redoc').className = mode === 'redoc' ? btnActive : btnInactive;
             
             renderDocs();
         }
 
-        function renderDocs() {
-            const specUrl = `http://localhost:8080/api/v1/specifications/${currentService}/latest`;
+        async function renderDocs() {
+            const specUrl = currentVersion 
+                ? `http://localhost:8080/api/v1/specifications/${currentService}/version/${currentVersion}`
+                : `http://localhost:8080/api/v1/specifications/${currentService}/latest`;
+                
+            const overviewDiv = document.getElementById('overview-container');
             const swaggerDiv = document.getElementById('swagger-ui');
             const redocDiv = document.getElementById('redoc-container');
 
-            if (currentMode === 'swagger') {
+            // Скрываем все
+            overviewDiv.classList.add('hidden');
+            swaggerDiv.classList.add('hidden');
+            redocDiv.classList.add('hidden');
+
+            if (currentMode === 'overview') {
+                overviewDiv.classList.remove('hidden');
+                
+                try {
+                    const token = localStorage.getItem('access_token');
+                    const res = await fetch(specUrl, { headers: { 'Authorization': `Bearer ${token}` } });
+                    const spec = await res.json();
+                    
+                    document.getElementById('ov-title').innerText = spec.info.title || currentService;
+                    document.getElementById('ov-version').innerText = 'v' + (spec.info.version || currentVersion);
+                    document.getElementById('ov-openapi').innerText = spec.openapi || '3.0.0';
+                    document.getElementById('ov-desc').innerText = spec.info.description || 'Описание отсутствует.';
+                    
+                    const epContainer = document.getElementById('ov-endpoints');
+                    epContainer.innerHTML = '';
+                    
+                    if (spec.paths) {
+                        for (const [path, methods] of Object.entries(spec.paths)) {
+                            for (const [method, details] of Object.entries(methods)) {
+                                let methodColor = 'gray';
+                                if (method.toUpperCase() === 'GET') methodColor = 'blue';
+                                if (method.toUpperCase() === 'POST') methodColor = 'green';
+                                if (method.toUpperCase() === 'PUT' || method.toUpperCase() === 'PATCH') methodColor = 'yellow';
+                                if (method.toUpperCase() === 'DELETE') methodColor = 'red';
+                                
+                                epContainer.innerHTML += `
+                                    <div class="flex items-start gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md transition">
+                                        <div class="w-20 flex-shrink-0 mt-0.5">
+                                            <span class="block text-center font-bold text-xs px-2 py-1 rounded bg-${methodColor}-100 text-${methodColor}-700 dark:bg-${methodColor}-900 dark:text-${methodColor}-300 uppercase">${method}</span>
+                                        </div>
+                                        <div class="flex-grow">
+                                            <div class="font-mono text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1 break-all">${path}</div>
+                                            <div class="text-sm text-gray-600 dark:text-gray-400">${details.summary || ''}</div>
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to render overview", e);
+                    document.getElementById('ov-title').innerText = "Ошибка загрузки данных";
+                }
+                
+            } else if (currentMode === 'swagger') {
                 swaggerDiv.classList.remove('hidden');
-                redocDiv.classList.add('hidden');
-                // Добавляем токен для Swagger, чтобы он мог скачивать саму схему OpenAPI
                 SwaggerUIBundle({ 
                     url: specUrl, 
                     dom_id: '#swagger-ui', 
@@ -180,8 +310,7 @@
                         return req;
                     }
                 });
-            } else {
-                swaggerDiv.classList.add('hidden');
+            } else if (currentMode === 'redoc') {
                 redocDiv.classList.remove('hidden');
                 Redoc.init(specUrl, { theme: { colors: { primary: { main: '#4f46e5' } } } }, redocDiv);
             }
@@ -201,11 +330,88 @@
             window.location.href = '/login.html';
         });
 
+        // Модальное окно и парсинг токена
+        function parseJwt(token) {
+            try {
+                return JSON.parse(atob(token.split('.')[1]));
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function showMockModal() {
+            document.getElementById('mockModal').classList.remove('hidden');
+        }
+
+        function hideMockModal() {
+            document.getElementById('mockModal').classList.add('hidden');
+            document.getElementById('mockError').classList.add('hidden');
+            document.getElementById('mockForm').reset();
+        }
+
+        document.getElementById('mockForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const token = localStorage.getItem('access_token');
+            const name = document.getElementById('mockName').value.trim();
+            const version = document.getElementById('mockVersion').value.trim();
+            const desc = document.getElementById('mockDescription').value.trim();
+            const errorDiv = document.getElementById('mockError');
+
+            const spec = {
+                openapi: "3.0.3",
+                info: {
+                    title: name + " API (Mock)",
+                    version: version,
+                    description: desc || "Mock service generated via UI."
+                },
+                paths: {
+                    "/ping": {
+                        get: {
+                            summary: "Health Check",
+                            responses: { "200": { description: "OK" } }
+                        }
+                    }
+                }
+            };
+
+            try {
+                const res = await fetch('http://localhost:8080/api/v1/specifications/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Service-Name': name,
+                        'X-Service-Version': version,
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(spec)
+                });
+
+                if (res.ok) {
+                    hideMockModal();
+                    loadServices(); // Обновляем список
+                } else {
+                    const errData = await res.json();
+                    errorDiv.innerText = errData.detail || 'Ошибка при создании';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Ошибка соединения';
+                errorDiv.classList.remove('hidden');
+            }
+        });
+
         window.onload = function() {
             // Извлекаем имя из localStorage и пишем в панель
             const username = localStorage.getItem('username') || 'Пользователь';
             document.getElementById('userDisplay').innerText = username;
             
+            // Проверка роли
+            const token = localStorage.getItem('access_token');
+            const payload = parseJwt(token);
+            if (payload && payload.role === 'admin') {
+                document.getElementById('adminActions').classList.remove('hidden');
+            }
+
             // Запускаем твою стандартную функцию загрузки карточек
             loadServices();
         };

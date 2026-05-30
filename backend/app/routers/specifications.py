@@ -37,10 +37,10 @@ async def register_specification(
         await db.commit()
         await db.refresh(api)
 
-    # 3. Деактивация старых версий
+    # 3. Деактивация старой записи с ТАКОЙ ЖЕ версией (если есть)
     await db.execute(
         update(SpecificationVersion)
-        .where(SpecificationVersion.api_id == api.id)
+        .where(SpecificationVersion.api_id == api.id, SpecificationVersion.version == x_service_version)
         .values(is_active=False)
     )
 
@@ -59,11 +59,12 @@ async def register_specification(
 
 @router.get("/{service_name}/latest")
 async def get_latest_spec(service_name: str, db: AsyncSession = Depends(get_db)):
-    """Возвращает саму JSON-спецификацию для Swagger UI / ReDoc"""
+    """Возвращает саму JSON-спецификацию для Swagger UI / ReDoc (последнюю добавленную)"""
     result = await db.execute(
         select(SpecificationVersion)
         .join(Api)
         .filter(Api.name == service_name, SpecificationVersion.is_active == True)
+        .order_by(SpecificationVersion.registered_at.desc())
     )
     spec = result.scalars().first()
     if not spec:
@@ -71,29 +72,45 @@ async def get_latest_spec(service_name: str, db: AsyncSession = Depends(get_db))
     return spec.specification
 
 
+@router.get("/{service_name}/version/{version}")
+async def get_spec_by_version(service_name: str, version: str, db: AsyncSession = Depends(get_db)):
+    """Возвращает JSON-спецификацию конкретной версии"""
+    result = await db.execute(
+        select(SpecificationVersion)
+        .join(Api)
+        .filter(Api.name == service_name, SpecificationVersion.version == version, SpecificationVersion.is_active == True)
+        .order_by(SpecificationVersion.registered_at.desc())
+    )
+    spec = result.scalars().first()
+    if not spec:
+        raise HTTPException(status_code=404, detail="Specification version not found")
+    return spec.specification
+
+
 @router.get("/services")
 async def get_active_services(db: AsyncSession = Depends(get_db)):
-    """Возвращает список всех зарегистрированных сервисов для отрисовки карточек"""
-    # Делаем JOIN, чтобы достать и данные API, и данные активной версии одним запросом
+    """Возвращает список всех зарегистрированных сервисов и их версий для отрисовки карточек"""
     result = await db.execute(
         select(Api, SpecificationVersion)
         .join(SpecificationVersion, Api.id == SpecificationVersion.api_id)
         .filter(SpecificationVersion.is_active == True)
+        .order_by(SpecificationVersion.registered_at.desc())
     )
     
-    services = []
-    # result.all() вернет список кортежей (Api, SpecificationVersion)
+    services_dict = {}
     for api, spec in result.all():
-        # Берем описание либо из таблицы Api, либо из самого JSON документации
-        description = api.description or spec.specification.get("info", {}).get("description", "Описание отсутствует")
-        
-        services.append({
-            "name": api.name,
-            "version": spec.version,
-            "description": description
-        })
-        
-    return services
+        if api.name not in services_dict:
+            description = api.description or spec.specification.get("info", {}).get("description", "Описание отсутствует")
+            services_dict[api.name] = {
+                "name": api.name,
+                "versions": [],
+                "description": description,
+                "latest_version": spec.version
+            }
+        if spec.version not in services_dict[api.name]["versions"]:
+            services_dict[api.name]["versions"].append(spec.version)
+            
+    return list(services_dict.values())
 
 
 @router.get("/{service_name}/health")

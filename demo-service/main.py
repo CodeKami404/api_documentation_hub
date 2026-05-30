@@ -10,7 +10,7 @@ HUB_URL = os.getenv("HUB_URL", "http://backend:8080/api/v1/specifications/")
 
 app = FastAPI(
     title="Demo Startup API", 
-    version="1.0.0",
+    version="2.0.0",
     servers=[{"url": "http://localhost:8000", "description": "Local Demo Server"}] 
 )
 
@@ -104,3 +104,10 @@ async def create_project(project: ProjectCreate):
     projects_db.append(new_project)
     print(f"--- Получен POST запрос через прокси: {new_project} ---")
     return {"message": "Project created!", "project": new_project}
+
+@app.delete("/api/projects/{project_id}")
+async def delete_project(project_id: int):
+    """(НОВОЕ В v2.0.0) Удаление проекта по ID"""
+    global projects_db
+    projects_db = [p for p in projects_db if p.get("id") != project_id]
+    return {"message": f"Project {project_id} deleted successfully"}
